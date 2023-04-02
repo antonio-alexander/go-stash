@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"github.com/antonio-alexander/go-stash"
+	"github.com/antonio-alexander/go-stash/internal"
 	"github.com/antonio-alexander/go-stash/memory"
 	"github.com/antonio-alexander/go-stash/tests"
+	"github.com/stretchr/testify/assert"
 )
 
 func init() {
@@ -18,7 +20,12 @@ func TestStashMemory(t *testing.T) {
 	const debug = true
 
 	newStash := func(config memory.Configuration) stash.Stasher {
-		return memory.New(config)
+		logger := internal.NewLogger()
+		m := memory.New()
+		m.SetParameters(logger)
+		err := m.Configure(config)
+		assert.Nil(t, err)
+		return m
 	}
 	t.Run("Stash", tests.TestStash(t, func() stash.Stasher {
 		return newStash(memory.Configuration{})
@@ -28,9 +35,10 @@ func TestStashMemory(t *testing.T) {
 			stash.Stasher
 		} {
 			return newStash(memory.Configuration{
-				TimeToLive: timeToLive,
-				MaxSize:    maxSize,
-				Debug:      debug,
+				TimeToLive:  timeToLive,
+				MaxSize:     maxSize,
+				Debug:       debug,
+				DebugPrefix: "[stash] ",
 			})
 		}))
 	t.Run("Evict Least Recently Used", tests.TestEvictLeastRecentlyUsed(t,
@@ -42,6 +50,7 @@ func TestStashMemory(t *testing.T) {
 				TimeToLive:     timeToLive,
 				MaxSize:        maxSize,
 				Debug:          debug,
+				DebugPrefix:    "[stash] ",
 			})
 		}))
 	t.Run("Evict Least Frequently Used", tests.TestEvictLeastFrequentlyUsed(t,
@@ -53,6 +62,7 @@ func TestStashMemory(t *testing.T) {
 				TimeToLive:     timeToLive,
 				MaxSize:        maxSize,
 				Debug:          debug,
+				DebugPrefix:    "[stash] ",
 			})
 		}))
 	t.Run("Evict First In First Out", tests.TestEvictFirstInFirstOut(t,
@@ -64,6 +74,7 @@ func TestStashMemory(t *testing.T) {
 				TimeToLive:     timeToLive,
 				MaxSize:        maxSize,
 				Debug:          debug,
+				DebugPrefix:    "[stash] ",
 			})
 		}))
 }

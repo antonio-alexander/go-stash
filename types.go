@@ -4,7 +4,7 @@ import (
 	"encoding"
 )
 
-//EvictionPolicy is a typed string used to describe the configured eviction
+// EvictionPolicy is a typed string used to describe the configured eviction
 // policy for a given Stasher
 type EvictionPolicy string
 
@@ -14,8 +14,8 @@ const (
 	FirstInFirstOut     EvictionPolicy = "first_in_first_out"
 )
 
-//Stasher is an interface used to read and write data to a cache/stash
-//KIM: Although key is an interface, if that interface doesn't contain
+// Stasher is an interface used to read and write data to a cache/stash
+// KIM: Although key is an interface, if that interface doesn't contain
 // something that is serializable, other concrete implementations won't
 // work.
 type Stasher interface {
@@ -37,7 +37,7 @@ type Stasher interface {
 	Delete(key interface{}) (err error)
 }
 
-//Cacheable is an interface used to describe values (and keys) that can
+// Cacheable is an interface used to describe values (and keys) that can
 // be stored within a cache/stash; this generally means that any value
 // provided to the cache/stash MUST be serializable
 type Cacheable interface {

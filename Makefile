@@ -9,7 +9,7 @@ help: ## - Show this help.
 	@sed -ne '/@sed/!s/## //p' $(MAKEFILE_LIST)
 
 check-lint: ## - validate/install golangci-lint installation
-	which golangci-lint || (go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.44.2)
+	which golangci-lint || (go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2)
 
 lint: check-lint ## - lint the source
 	golangci-lint run

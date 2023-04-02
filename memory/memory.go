@@ -1,57 +1,42 @@
 package memory
 
 import (
-	"fmt"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/antonio-alexander/go-stash"
+	"github.com/antonio-alexander/go-stash/internal"
 
 	"github.com/pkg/errors"
 )
 
 type stashMemory struct {
 	sync.Mutex
+	internal.Logger
 	data        map[interface{}]*cacheItem
-	config      Configuration
+	config      *Configuration
 	size        int
 	initialized bool
+	configured  bool
 }
 
-//New can be used to create a concrete instance of a memory
+// New can be used to create a concrete instance of a memory
 // cache/stash. If Configuration is provided, it will attempt
 // to initialize the pointer (it will panic if this initialization
 // fails)
-func New(parameters ...interface{}) interface {
+func New() interface {
 	stash.Stasher
 	Memory
 } {
-	var config Configuration
-	var configSet bool
-
-	s := &stashMemory{}
-	for _, parameter := range parameters {
-		switch p := parameter.(type) {
-		case *Configuration:
-			config = *p
-			configSet = true
-		case Configuration:
-			config = p
-			configSet = true
-		}
+	return &stashMemory{
+		data: make(map[interface{}]*cacheItem),
 	}
-	if configSet {
-		if err := s.Initialize(config); err != nil {
-			panic(err)
-		}
-	}
-	return s
 }
 
 func (s *stashMemory) printf(format string, a ...interface{}) {
-	if s.config.Debug {
-		fmt.Printf(format, a...)
+	if s.config.Debug && s.Logger != nil {
+		s.Printf(s.config.DebugPrefix+format, a...)
 	}
 }
 
@@ -78,6 +63,12 @@ func (s *stashMemory) evict() {
 			s.printf("key: %v, %d\n", cacheItem.key, cacheItem.nTimesRead)
 		}
 	}
+	//ensure we don't evict the only data that's in the
+	// stash even if we're above the max limit because
+	// there's only a single item in the stash
+	if len(cacheItems) <= 1 {
+		return
+	}
 	tNow := time.Now()
 	for _, cacheItem := range cacheItems {
 		if s.config.MaxSize > 0 {
@@ -100,37 +91,69 @@ func (s *stashMemory) evict() {
 	}
 }
 
-//Initialize can be used to setup internal pointers
-// and ready the stash for usage
-func (s *stashMemory) Initialize(config Configuration) error {
+// Configure
+func (s *stashMemory) Configure(items ...interface{}) error {
 	s.Lock()
 	defer s.Unlock()
+
+	var config *Configuration
+
+	for _, item := range items {
+		switch item := item.(type) {
+		case *Configuration:
+			config = item
+		case Configuration:
+			config = &item
+		}
+	}
+	s.config = config
+	s.configured = true
+	return nil
+}
+
+// SetParameters
+func (s *stashMemory) SetParameters(items ...interface{}) {
+	for _, item := range items {
+		switch item := item.(type) {
+		case internal.Logger:
+			s.Logger = item
+		}
+	}
+}
+
+// Initialize can be used to setup internal pointers
+// and ready the stash for usage
+func (s *stashMemory) Initialize() error {
+	s.Lock()
+	defer s.Unlock()
+
+	if !s.configured {
+		return errors.New("not configured")
+	}
 	if s.initialized {
 		return errors.New("already initialized")
 	}
 	s.size = 0
-	s.config = config
-	s.data = make(map[interface{}]*cacheItem)
 	s.initialized = true
 	return nil
 }
 
-//Shutdown can be used to tear down internal pointers
+// Shutdown can be used to tear down internal pointers
 // and ready the stash for garbage collection (or reuse)
 func (s *stashMemory) Shutdown() error {
 	s.Lock()
 	defer s.Unlock()
+
 	if !s.initialized {
 		return nil
 	}
-	for _, key := range s.data {
-		delete(s.data, key)
-	}
 	s.size = 0
+	s.data = make(map[interface{}]*cacheItem)
+	s.initialized, s.configured = false, false
 	return nil
 }
 
-//Write can be used to create/update a value in the cache with the given
+// Write can be used to create/update a value in the cache with the given
 // key. If the value exists, replaced will be true
 func (s *stashMemory) Write(key interface{}, item stash.Cacheable) (bool, error) {
 	s.Lock()
@@ -156,7 +179,7 @@ func (s *stashMemory) Write(key interface{}, item stash.Cacheable) (bool, error)
 	return found, nil
 }
 
-//Read can be used to read a value in the cache with the given key
+// Read can be used to read a value in the cache with the given key
 // if the value exists, it will be unmarshalled into the Cacheable
 // pointer; this is expected to work very much like an Unmarshal
 // function. If a value isn't found with the given key, an error
@@ -181,7 +204,7 @@ func (s *stashMemory) Read(key interface{}, v stash.Cacheable) error {
 	return nil
 }
 
-//Delete can be used to remove a value from the cache with a given
+// Delete can be used to remove a value from the cache with a given
 // key. If the value isn't found, an error is returned.
 func (s *stashMemory) Delete(key interface{}) error {
 	s.Lock()
