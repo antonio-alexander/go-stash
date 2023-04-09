@@ -5,6 +5,11 @@ All notable changes to this service will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.0.2] - 04/08/23
+
+- updated the version in an attempt to satisfy go proxy since it was a private repository
+- updated workflows
+
 ## [1.0.1] - 03/26/23
 
 - fixed bug where initialized boolean wasn't unset on shutdown

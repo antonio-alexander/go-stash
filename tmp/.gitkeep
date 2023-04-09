@@ -1,0 +1,1 @@
+go test -count=1 -v -cover ./... -coverprofile ./tmp/go-stash.out | tee ./tmp/go-stash.log; test ${PIPESTATUS[0]} -eq 0
