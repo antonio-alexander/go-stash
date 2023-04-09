@@ -1,14 +1,20 @@
-name: go-stash
+name: go-stash_push
 
 on:
   push:
+    branches:
+      - main
+
+env:
+  GO_VERSION: "1.19"
+  LINTER_VERSION: "v1.51.2"
 
 jobs:
   environment:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Get version
         run: |
           version=`cat /home/runner/work/go-stash/go-stash/version.json | jq '.Version' | sed 's/"//g'`
@@ -19,7 +25,7 @@ jobs:
           mkdir -p /tmp
           echo ${{ env.version }} >> /tmp/version
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: artifacts
           path: |
@@ -30,12 +36,12 @@ jobs:
     steps:
       - uses: actions/setup-go@v3
         with:
-          go-version: 1.17
+          go-version: ${{ env.GO_VERSION }}
       - uses: actions/checkout@v3
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.52.2
+          version: ${{ env.LINTER_VERSION }}
           working-directory: .
           args: --verbose
 
@@ -46,63 +52,32 @@ jobs:
       contents: read
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
-          go-version: 1.16
+          go-version: ${{ env.GO_VERSION }}
       - name: Test Stash
+        working-directory: /home/runner/work/go-stash/go-stash
         run: |
-          cd /home/runner/work/go-stash/go-stash
           go mod download
-          go test -v ./... -coverprofile /tmp/go-stash.out | tee /tmp/go-stash.log
+          go test -v -cover ./... -coverprofile /tmp/go-stash.out | tee /tmp/go-stash.log; test ${PIPESTATUS[0]} -eq 0
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: artifacts
           path: |
             /tmp/go-stash.log
             /tmp/go-stash.out
 
-  git_validate_tag:
-    needs: [environment]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: artifacts
-          path: /tmp
-      - name: Get Environment
-        run: |
-          version=`cat /tmp/version`
-          echo "version=$version" >> $GITHUB_ENV
-      - name: Check out repository code
-        uses: actions/checkout@v2
-      - name: Validate Version
-        working-directory: /home/runner/work/go-stash/go-stash
-        run: |
-          git fetch --tags
-          echo checking for tag v$version
-          tag=`git tag --list v$version`
-          if [ -z "$tag" ]
-          then
-                echo "tag v$version doesn't exist"
-          else
-                echo "tag v$version exists"
-                exit 1
-          fi
-
   git_push_tag:
-    needs: [go_test, git_validate_tag]
+    needs: [go_test]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: artifacts
           path: /tmp
@@ -111,7 +86,7 @@ jobs:
           version=`cat /tmp/version`
           echo "version=$version" >> $GITHUB_ENV
       - name: Check out repository code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: "0"
       - name: Push/Update version
