@@ -71,7 +71,7 @@ jobs:
             /tmp/go-stash.out
 
   git_push_tag:
-    needs: [go_test]
+    needs: [go_test, environment]
     runs-on: ubuntu-latest
     permissions:
       contents: write

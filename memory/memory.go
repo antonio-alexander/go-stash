@@ -35,7 +35,7 @@ func New() interface {
 }
 
 func (s *stashMemory) printf(format string, a ...interface{}) {
-	if s.config.Debug && s.Logger != nil {
+	if s.Logger != nil && s.config != nil && s.config.Debug {
 		s.Printf(s.config.DebugPrefix+format, a...)
 	}
 }
@@ -106,8 +106,10 @@ func (s *stashMemory) Configure(items ...interface{}) error {
 			config = &item
 		}
 	}
-	s.config = config
-	s.configured = true
+	if config != nil {
+		s.config = config
+		s.configured = true
+	}
 	return nil
 }
 
