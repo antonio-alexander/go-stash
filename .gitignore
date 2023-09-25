@@ -1,2 +1,4 @@
 !tmp/.gitkeep
 tmp/*
+.idea
+__debug_bin*

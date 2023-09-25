@@ -14,7 +14,7 @@ import (
 type stashMemory struct {
 	sync.Mutex
 	internal.Logger
-	data        map[interface{}]*cacheItem
+	data        map[interface{}]*stash.CachedItem
 	config      *Configuration
 	size        int
 	initialized bool
@@ -30,7 +30,7 @@ func New() interface {
 	Memory
 } {
 	return &stashMemory{
-		data: make(map[interface{}]*cacheItem),
+		data: make(map[interface{}]*stash.CachedItem),
 	}
 }
 
@@ -48,19 +48,19 @@ func (s *stashMemory) evict() {
 	}
 	switch evictionPolicy {
 	case stash.FirstInFirstOut:
-		sort.Sort(byFirstCreated(cacheItems))
+		sort.Sort(stash.ByFirstCreated(cacheItems))
 		for _, cacheItem := range cacheItems {
-			s.printf("key: %v, %v\n", cacheItem.key, cacheItem.lastRead)
+			s.printf("key: %v, %v\n", cacheItem.Key, cacheItem.LastRead)
 		}
 	case stash.LeastRecentlyUsed:
-		sort.Sort(byLastRead(cacheItems))
+		sort.Sort(stash.ByLastRead(cacheItems))
 		for _, cacheItem := range cacheItems {
-			s.printf("key: %v, %v\n", cacheItem.key, cacheItem.lastRead)
+			s.printf("key: %v, %v\n", cacheItem.Key, cacheItem.LastRead)
 		}
 	case stash.LeastFrequentlyUsed:
-		sort.Sort(byTimesRead(cacheItems))
+		sort.Sort(stash.ByTimesRead(cacheItems))
 		for _, cacheItem := range cacheItems {
-			s.printf("key: %v, %d\n", cacheItem.key, cacheItem.nTimesRead)
+			s.printf("key: %v, %d\n", cacheItem.Key, cacheItem.NTimesRead)
 		}
 	}
 	//ensure we don't evict the only data that's in the
@@ -80,13 +80,13 @@ func (s *stashMemory) evict() {
 				return
 			}
 		case s.config.MaxSize > 0 && s.size > s.config.MaxSize:
-			s.size = s.size - cacheItem.size
-			delete(s.data, cacheItem.key)
-			s.printf("evicted key: %v, max size exceeded\n", cacheItem.key)
-		case s.config.TimeToLive > 0 && tNow.Sub(cacheItem.lastUpdated) > s.config.TimeToLive:
-			s.size = s.size - cacheItem.size
-			delete(s.data, cacheItem.key)
-			s.printf("evicted key: %v, ttl exceeded\n", cacheItem.key)
+			s.size = s.size - cacheItem.Size
+			delete(s.data, cacheItem.Key)
+			s.printf("evicted key: %v, max size exceeded\n", cacheItem.Key)
+		case s.config.TimeToLive > 0 && tNow.Sub(time.Unix(0, cacheItem.LastUpdated)) > s.config.TimeToLive:
+			s.size = s.size - cacheItem.Size
+			delete(s.data, cacheItem.Key)
+			s.printf("evicted key: %v, ttl exceeded\n", cacheItem.Key)
 		}
 	}
 }
@@ -110,6 +110,7 @@ func (s *stashMemory) Configure(items ...interface{}) error {
 		s.config = config
 		s.configured = true
 	}
+
 	return nil
 }
 
@@ -137,6 +138,7 @@ func (s *stashMemory) Initialize() error {
 	}
 	s.size = 0
 	s.initialized = true
+
 	return nil
 }
 
@@ -150,8 +152,9 @@ func (s *stashMemory) Shutdown() error {
 		return nil
 	}
 	s.size = 0
-	s.data = make(map[interface{}]*cacheItem)
+	s.data = make(map[interface{}]*stash.CachedItem)
 	s.initialized, s.configured = false, false
+
 	return nil
 }
 
@@ -161,23 +164,25 @@ func (s *stashMemory) Write(key interface{}, item stash.Cacheable) (bool, error)
 	s.Lock()
 	defer s.evict()
 	defer s.Unlock()
+
 	cacheItem, found := s.data[key]
 	if found {
-		s.size -= cacheItem.size
-		if err := updateCacheItem(cacheItem, item); err != nil {
+		s.size -= cacheItem.Size
+		if err := stash.UpdateCacheItem(cacheItem, item); err != nil {
 			return false, err
 		}
-		s.size += cacheItem.size
+		s.size += cacheItem.Size
 		s.printf("updated key: %v\n", key)
 		return found, nil
 	}
-	cacheItem, err := createCacheItem(key, item)
+	cacheItem, err := stash.CreateCacheItem(key, item)
 	if err != nil {
 		return false, err
 	}
 	s.data[key] = cacheItem
-	s.size += cacheItem.size
+	s.size += cacheItem.Size
 	s.printf("created key: %v\n", key)
+
 	return found, nil
 }
 
@@ -190,19 +195,21 @@ func (s *stashMemory) Read(key interface{}, v stash.Cacheable) error {
 	s.Lock()
 	defer s.evict()
 	defer s.Unlock()
+
 	item, found := s.data[key]
 	if !found {
 		return errors.Errorf("value for %s not found", key)
 	}
-	item.lastRead = time.Now()
-	item.nTimesRead++
-	bytes := make([]byte, len(item.bytes))
-	copy(bytes, item.bytes)
-	err := v.UnmarshalBinary(item.bytes)
+	item.LastRead = time.Now().UnixNano()
+	item.NTimesRead++
+	bytes := make([]byte, len(item.Bytes))
+	copy(bytes, item.Bytes)
+	err := v.UnmarshalBinary(item.Bytes)
 	if err != nil {
 		return err
 	}
 	s.printf("read key: %v\n", key)
+
 	return nil
 }
 
@@ -210,11 +217,14 @@ func (s *stashMemory) Read(key interface{}, v stash.Cacheable) error {
 // key. If the value isn't found, an error is returned.
 func (s *stashMemory) Delete(key interface{}) error {
 	s.Lock()
+	defer s.evict()
 	defer s.Unlock()
+
 	if _, ok := s.data[key]; !ok {
 		return errors.Errorf("value not found for key: %v", key)
 	}
 	delete(s.data, key)
 	s.printf("deleted key: %v\n", key)
+
 	return nil
 }

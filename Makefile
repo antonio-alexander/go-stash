@@ -9,19 +9,19 @@ help: ## Show this help.
 	@sed -ne '/@sed/!s/## //p' $(MAKEFILE_LIST)
 
 check-lint: ## validate/install golangci-lint installation
-	which golangci-lint || (go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2)
+	@which golangci-lint || (go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2)
 
-lint: check-lint ## lint the source
-	golangci-lint run
-
-lint-verbose: check-lint ## lint the source with verbose output
-	golangci-lint run --verbose
+lint: check-lint ## lint the source with verbose output
+	@golangci-lint run --verbose
 
 check-godoc: ## validate/install godoc
-	which godoc || (go install golang.org/x/tools/cmd/godoc@v0.1.10)
+	@which godoc || (go install golang.org/x/tools/cmd/godoc@v0.1.10)
 
 serve-godoc: check-godoc ## serve (web) the godocs
 	godoc -http :8080
 
 test: ## test the source
-	go test -v -race -cover ./... -coverprofile ./tmp/go-stash.out | tee ./tmp/go-stash.log
+	go test --count=1 -p 1 -v -cover ./... -coverprofile ./tmp/go-stash.out | tee ./tmp/go-stash.log
+
+dep: ## bring up dependencies
+	docker compose up -d --wait

@@ -6,16 +6,6 @@ import (
 	"github.com/antonio-alexander/go-stash"
 )
 
-type cacheItem struct {
-	key          interface{}
-	bytes        []byte
-	firstCreated time.Time
-	lastUpdated  time.Time
-	lastRead     time.Time
-	nTimesRead   int
-	size         int
-}
-
 // Memory describes the concrete implementation of the memory stash
 // that isn't described by the Stasher interface
 type Memory interface {

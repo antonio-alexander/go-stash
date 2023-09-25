@@ -2,6 +2,7 @@ package stash
 
 import (
 	"encoding"
+	"encoding/json"
 )
 
 // EvictionPolicy is a typed string used to describe the configured eviction
@@ -43,4 +44,22 @@ type Stasher interface {
 type Cacheable interface {
 	encoding.BinaryMarshaler
 	encoding.BinaryUnmarshaler
+}
+
+type CachedItem struct {
+	Key          interface{} `json:"key"`
+	Bytes        []byte      `json:"bytes"`
+	FirstCreated int64       `json:"first_created,string"`
+	LastUpdated  int64       `json:"last_updated,string"`
+	LastRead     int64       `json:"last_read,string"`
+	NTimesRead   int         `json:"n_times_read"`
+	Size         int         `json:"size"`
+}
+
+func (c *CachedItem) MarshalBinary() ([]byte, error) {
+	return json.Marshal(c)
+}
+
+func (c *CachedItem) UnmarshalBinary(bytes []byte) error {
+	return json.Unmarshal(bytes, c)
 }
