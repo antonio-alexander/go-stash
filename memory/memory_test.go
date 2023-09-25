@@ -1,7 +1,6 @@
 package memory_test
 
 import (
-	"math/rand"
 	"testing"
 	"time"
 
@@ -9,12 +8,9 @@ import (
 	"github.com/antonio-alexander/go-stash/internal"
 	"github.com/antonio-alexander/go-stash/memory"
 	"github.com/antonio-alexander/go-stash/tests"
+
 	"github.com/stretchr/testify/assert"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 func TestStashMemory(t *testing.T) {
 	const debug = true

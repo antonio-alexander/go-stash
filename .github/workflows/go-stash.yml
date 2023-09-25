@@ -1,7 +1,7 @@
-name: go-stash_pull_request
+name: go-stash
 
 on:
-  pull_request:
+  push:
     branches:
       - main
 
@@ -31,53 +31,7 @@ jobs:
           path: |
             /tmp/version
 
-  version_validate:
-    needs: [environment]
-    runs-on: ubuntu-20.04
-    permissions:
-      contents: read
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: artifacts
-          path: /tmp
-      - name: Checkout repository code
-        uses: actions/checkout@v3
-      - name: Validate Version Updated
-        working-directory: /home/runner/work/go-stash/go-stash
-        run: |
-          echo "checking to see if version.json updated"
-          git fetch origin main:refs/remotes/origin/main
-          git_diff_output=`git diff origin/main --name-only | grep version.json`
-          if [ "$git_diff_output" != "version.json" ]; then
-               echo "version.json has not been updated, version.json must be updated for a pull request"
-          fi
-      - name: Validate Changelog Updated
-        working-directory: /home/runner/work/go-stash/go-stash
-        run: |
-          echo "checking to see if CHANGELOG.md updated"
-          git fetch origin main:refs/remotes/origin/main
-          git_diff_output=`git diff origin/main --name-only | grep CHANGELOG.md`
-          if [ "$git_diff_output" != "CHANGELOG.md" ]; then
-               echo "CHANGELOG.md has not been updated, CHANGELOG.md must be updated for a pull request"
-          fi
-      - name: Validate Version
-        working-directory: /home/runner/work/go-stash/go-stash
-        run: |
-          git fetch --tags
-          echo checking for tag v$version
-          tag=`git tag --list v$version`
-          if [ -z "$tag" ]
-          then
-                echo "tag v$version doesn't exist"
-          else
-                echo "tag v$version exists"
-                exit 1
-          fi
-
   go_lint:
-    needs: [version_validate]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-go@v3
@@ -106,6 +60,7 @@ jobs:
       - name: Test Stash
         working-directory: /home/runner/work/go-stash/go-stash
         run: |
+          make dep
           go mod download
           go test -v -cover ./... -coverprofile /tmp/go-stash.out | tee /tmp/go-stash.log; test ${PIPESTATUS[0]} -eq 0
       - name: Upload artifacts
@@ -115,3 +70,29 @@ jobs:
           path: |
             /tmp/go-stash.log
             /tmp/go-stash.out
+
+  git_push_tag:
+    runs-on: ubuntu-latest
+    needs: [go_test, environment]
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: artifacts
+          path: /tmp
+      - name: Get environment
+        run: |
+          version=`cat /tmp/version`
+          echo "version=$version" >> $GITHUB_ENV
+      - name: Check out repository code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: "0"
+      - name: Push/Update version
+        uses: anothrNick/github-tag-action@1.36.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: true
+          CUSTOM_TAG: v${{ env.version }}

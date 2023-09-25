@@ -2,8 +2,7 @@
     "go.lintTool": "golangci-lint",
     "go.testFlags": [
         "-v",
-        "count=1",
-        "-race",
-        "-coverpkg=github.com/antonio-alexander/go-stash,github.com/antonio-alexander/go-stash/memory"
+        "-count=1",
+        "-coverpkg=github.com/antonio-alexander/go-stash,github.com/antonio-alexander/go-stash/memory,github.com/antonio-alexander/go-stash/redis"
     ]
 }
