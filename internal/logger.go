@@ -1,17 +1,17 @@
 package internal
 
-import "fmt"
+import (
+	"fmt"
 
-type Logger interface {
-	Printf(format string, a ...any) (n int, err error)
-}
+	"github.com/antonio-alexander/go-stash"
+)
 
 type logger struct{}
 
-func NewLogger() Logger {
+func NewLogger() stash.Logger {
 	return &logger{}
 }
 
-func (l *logger) Printf(format string, a ...any) (int, error) {
-	return fmt.Printf(format, a...)
+func (l *logger) Printf(format string, a ...any) {
+	fmt.Printf(format, a...)
 }

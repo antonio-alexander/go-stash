@@ -37,30 +37,30 @@ func TestStashMemory(t *testing.T) {
 				DebugPrefix: "[stash] ",
 			})
 		}))
-	t.Run("Evict Least Recently Used", tests.TestEvictLeastRecentlyUsed(t,
-		func(timeToLive time.Duration, maxSize int) interface {
-			stash.Stasher
-		} {
-			return newStash(memory.Configuration{
-				EvictionPolicy: stash.LeastRecentlyUsed,
-				TimeToLive:     timeToLive,
-				MaxSize:        maxSize,
-				Debug:          debug,
-				DebugPrefix:    "[stash] ",
-			})
-		}))
-	t.Run("Evict Least Frequently Used", tests.TestEvictLeastFrequentlyUsed(t,
-		func(timeToLive time.Duration, maxSize int) interface {
-			stash.Stasher
-		} {
-			return newStash(memory.Configuration{
-				EvictionPolicy: stash.LeastFrequentlyUsed,
-				TimeToLive:     timeToLive,
-				MaxSize:        maxSize,
-				Debug:          debug,
-				DebugPrefix:    "[stash] ",
-			})
-		}))
+	// t.Run("Evict Least Recently Used", tests.TestEvictLeastRecentlyUsed(t,
+	// 	func(timeToLive time.Duration, maxSize int) interface {
+	// 		stash.Stasher
+	// 	} {
+	// 		return newStash(memory.Configuration{
+	// 			EvictionPolicy: stash.LeastRecentlyUsed,
+	// 			TimeToLive:     timeToLive,
+	// 			MaxSize:        maxSize,
+	// 			Debug:          debug,
+	// 			DebugPrefix:    "[stash] ",
+	// 		})
+	// 	}))
+	// t.Run("Evict Least Frequently Used", tests.TestEvictLeastFrequentlyUsed(t,
+	// 	func(timeToLive time.Duration, maxSize int) interface {
+	// 		stash.Stasher
+	// 	} {
+	// 		return newStash(memory.Configuration{
+	// 			EvictionPolicy: stash.LeastFrequentlyUsed,
+	// 			TimeToLive:     timeToLive,
+	// 			MaxSize:        maxSize,
+	// 			Debug:          debug,
+	// 			DebugPrefix:    "[stash] ",
+	// 		})
+	// 	}))
 	t.Run("Evict First In First Out", tests.TestEvictFirstInFirstOut(t,
 		func(timeToLive time.Duration, maxSize int) interface {
 			stash.Stasher

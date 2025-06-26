@@ -22,20 +22,23 @@ const (
 type Stasher interface {
 	//Write can be used to create/update a value in the cache with the given
 	// key. If the value exists, replaced will be true
-	Write(key interface{}, value Cacheable) (replaced bool, err error)
+	Write(key any, value Cacheable) (replaced bool, err error)
 
 	//Read can be used to read a value in the cache with the given key
 	// if the value exists, it will be unmarshalled into the Cacheable
 	// pointer; this is expected to work very much like an Unmarshal
 	// function. If a value isn't found with the given key, an error
 	// will be returned
-	Read(key interface{}, v Cacheable) (err error)
+	Read(key any, v Cacheable) (err error)
 
 	//Delete can be used to remove a value from the cache with a given
 	// key. If the value isn't found, an error is returned.
 	//KIM: this function doesn't return the value by design; why would
 	// you need to read the value if you're deleting it?
-	Delete(key interface{}) (err error)
+	Delete(key any) (err error)
+
+	//Clear can be used to empty a given cache
+	Clear() (err error)
 }
 
 // Cacheable is an interface used to describe values (and keys) that can
@@ -47,13 +50,13 @@ type Cacheable interface {
 }
 
 type CachedItem struct {
-	Key          interface{} `json:"key"`
-	Bytes        []byte      `json:"bytes"`
-	FirstCreated int64       `json:"first_created,string"`
-	LastUpdated  int64       `json:"last_updated,string"`
-	LastRead     int64       `json:"last_read,string"`
-	NTimesRead   int         `json:"n_times_read"`
-	Size         int         `json:"size"`
+	Key          any    `json:"key"`
+	Bytes        []byte `json:"bytes"`
+	FirstCreated int64  `json:"first_created,string"`
+	LastUpdated  int64  `json:"last_updated,string"`
+	LastRead     int64  `json:"last_read,string"`
+	NTimesRead   int    `json:"n_times_read"`
+	Size         int    `json:"size"`
 }
 
 func (c *CachedItem) MarshalBinary() ([]byte, error) {
@@ -62,4 +65,30 @@ func (c *CachedItem) MarshalBinary() ([]byte, error) {
 
 func (c *CachedItem) UnmarshalBinary(bytes []byte) error {
 	return json.Unmarshal(bytes, c)
+}
+
+type Configurer interface {
+	//Configure
+	Configure(...any) error
+}
+
+type Parameterizer interface {
+	//SetParameters
+	SetParameters(...any)
+}
+
+type Initializer interface {
+	//Initialize can be used to setup internal pointers
+	// and ready the stash for usage
+	Initialize() error
+}
+
+type Shutdowner interface {
+	//Shutdown can be used to tear down internal pointers
+	// and ready the stash for garbage collection (or reuse)
+	Shutdown() error
+}
+
+type Logger interface {
+	Printf(format string, a ...any)
 }

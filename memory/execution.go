@@ -4,9 +4,10 @@ import (
 	"github.com/antonio-alexander/go-stash"
 )
 
-func toSlice(items map[interface{}]*stash.CachedItem) (cachedItems []*stash.CachedItem) {
+func toSlice(items map[any]*stash.CachedItem) []*stash.CachedItem {
+	cachedItems := make([]*stash.CachedItem, 0, len(items))
 	for _, cachedItem := range items {
 		cachedItems = append(cachedItems, cachedItem)
 	}
-	return
+	return cachedItems
 }

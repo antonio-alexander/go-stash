@@ -9,7 +9,6 @@ import (
 	"time"
 
 	stash "github.com/antonio-alexander/go-stash"
-	internal "github.com/antonio-alexander/go-stash/internal"
 
 	errors "github.com/pkg/errors"
 	redis "github.com/redis/go-redis/v9"
@@ -19,41 +18,29 @@ type stashRedis struct {
 	sync.RWMutex
 	sync.WaitGroup
 	*redis.Client
-	internal.Logger
+	logger      stash.Logger
 	stopper     chan struct{}
 	config      *Configuration
 	initialized bool
 	configured  bool
 }
 
-func New(parameters ...interface{}) interface {
+func New(parameters ...any) interface {
 	stash.Stasher
-	Redis
+	stash.Configurer
+	stash.Initializer
+	stash.Shutdowner
+	stash.Parameterizer
 } {
-	var configured bool
 
 	s := &stashRedis{}
 	s.SetParameters(parameters...)
-	for _, parameter := range parameters {
-		switch p := parameter.(type) {
-		case *Configuration:
-			if err := s.Configure(p); err != nil {
-				panic(err)
-			}
-			configured = true
-		}
-	}
-	if configured {
-		if err := s.Initialize(); err != nil {
-			panic(err)
-		}
-	}
 	return s
 }
 
-func (s *stashRedis) printf(format string, a ...interface{}) {
-	if s.Logger != nil && s.config != nil && s.config.Debug {
-		s.Logger.Printf(s.config.DebugPrefix+format, a...)
+func (s *stashRedis) printf(format string, a ...any) {
+	if s.logger != nil && s.config != nil && s.config.Debug {
+		s.logger.Printf(s.config.DebugPrefix+format, a...)
 	}
 }
 
@@ -153,7 +140,7 @@ func (s *stashRedis) launchEvict() {
 	<-started
 }
 
-func (s *stashRedis) write(key, item interface{}) error {
+func (s *stashRedis) write(key, item any) error {
 	var bytes []byte
 
 	field, err := parseKey(key)
@@ -180,7 +167,7 @@ func (s *stashRedis) write(key, item interface{}) error {
 	return s.HSet(ctx, s.config.HashKey, field, string(bytes)).Err()
 }
 
-func (s *stashRedis) read(key interface{}) (*stash.CachedItem, error) {
+func (s *stashRedis) read(key any) (*stash.CachedItem, error) {
 	var cachedItem stash.CachedItem
 
 	field, err := parseKey(key)
@@ -199,7 +186,7 @@ func (s *stashRedis) read(key interface{}) (*stash.CachedItem, error) {
 	return &cachedItem, nil
 }
 
-func (s *stashRedis) Configure(items ...interface{}) error {
+func (s *stashRedis) Configure(items ...any) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -211,23 +198,28 @@ func (s *stashRedis) Configure(items ...interface{}) error {
 			config = item
 		case Configuration:
 			config = &item
+		case map[string]string:
+			config = &Configuration{}
+			config.Default()
+			config.FromEnvs(item)
 		}
 	}
 	if config != nil {
 		s.config = config
 		s.configured = true
 	}
+
 	return nil
 }
 
-func (s *stashRedis) SetParameters(items ...interface{}) {
+func (s *stashRedis) SetParameters(items ...any) {
 	s.Lock()
 	defer s.Unlock()
 
 	for _, item := range items {
 		switch item := item.(type) {
-		case internal.Logger:
-			s.Logger = item
+		case stash.Logger:
+			s.logger = item
 		}
 	}
 }
@@ -261,13 +253,13 @@ func (s *stashRedis) Shutdown() error {
 	ctx, cancel := context.WithTimeout(context.Background(), s.config.Timeout)
 	defer cancel()
 	if err := s.Client.Shutdown(ctx).Err(); err != nil {
-		return err
+		s.printf("error while shutting down client: %s", err)
 	}
 	s.initialized, s.configured = false, false
 	return nil
 }
 
-func (s *stashRedis) Write(key interface{}, itemToCache stash.Cacheable) (bool, error) {
+func (s *stashRedis) Write(key any, itemToCache stash.Cacheable) (bool, error) {
 	s.RLock()
 	defer s.evict()
 	defer s.RUnlock()
@@ -299,7 +291,7 @@ func (s *stashRedis) Write(key interface{}, itemToCache stash.Cacheable) (bool, 
 	}
 }
 
-func (s *stashRedis) Read(key interface{}, v stash.Cacheable) error {
+func (s *stashRedis) Read(key any, v stash.Cacheable) error {
 	s.RLock()
 	defer s.evict()
 	defer s.RUnlock()
@@ -325,7 +317,7 @@ func (s *stashRedis) Read(key interface{}, v stash.Cacheable) error {
 	return nil
 }
 
-func (s *stashRedis) Delete(key interface{}) error {
+func (s *stashRedis) Delete(key any) error {
 	s.RLock()
 	defer s.evict()
 	defer s.RUnlock()
@@ -344,5 +336,25 @@ func (s *stashRedis) Delete(key interface{}) error {
 		return errors.Errorf("value for %s not found", key)
 	}
 	s.printf("deleted key: %v\n", key)
+	return nil
+}
+
+func (s *stashRedis) Clear() error {
+	s.Lock()
+	defer s.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), s.config.Timeout)
+	defer cancel()
+	keys, err := s.HKeys(ctx, s.config.HashKey).Result()
+	if err != nil {
+		return err
+	}
+	for _, key := range keys {
+		if _, err := s.HDel(ctx, s.config.HashKey,
+			key).Result(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
